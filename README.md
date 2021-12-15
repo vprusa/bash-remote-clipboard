@@ -3,7 +3,7 @@
 ## Motivation
 
 I frequently copy-past from/to terminal.
-I have run into troubles with texts containing escape characters, wierd enconding and EOF characters with which it was annoying to copy text from remote machines and I have ended up with using tmp files and scp. 
+I have run into troubles with texts containing escape characters, wierd enconding and EOF characters with which it was annoying to copy text from/to remote machines and I have ended up with using tmp files and scp. 
 
 I want to share data across localhost and remote machines effortlessely (no need to use mouse and deal with intermediate subtasks of copying it), smoothly (having it as bash function so I can use pipe), persistently (if needed keep the data somewhere), modular (I have many remote machines and some of them may be under some circumstances 'local' machines to other remote machines), fail-safe (catching errors) and securely (I can NOT share physically localhost clipboard and having it under SSH seems like a valid option here).
 
@@ -13,6 +13,8 @@ On both local and remote machines execute:
 
 ```
 git clone https://github.com/VUTBR-CVIS/bash-remote-clipboard.git
+cd bash-remote-clipboard
+source ./main.sh # should do the trick
 ```
 
 On local machine it is necessary to configure SSH access to remote machine.
@@ -53,3 +55,4 @@ There will be
 ## TODO ..
 
 - core idea is wirtten down, after writing this README.md I have realized that I need to rewrite some parts of it...
+- add to local function `_rp ` default remote as last machine used 

@@ -1,81 +1,156 @@
 #!/bin/bash
+############################################################
+# vprusa, 2021, prusa.vojtech@gmail.com
+############################################################
 
 # notes:
-# CB = "clipboard"
+# RCB = "Remote ClipBoard"
+# basically: remote clipboard is a scp wrapper and local clipboard is xclip wrapper 
+# for both the idea is not to have imposible number of tmp files and have them in 1 known place
+# '_rc' and '_rp' do not need 'source ./config.sh' and 
+# '_lc' and '_lp' do need 'source ./config.sh' to decide to/from which remote to pase/copy 
+
+# TODO add clipboards as Array, e.g. files: rcb-c[-X:int] and rcb-p[-Y:int] and  
+
+############################################################
+# initialization, configuration
+############################################################
+
 THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 NOW_FILE_NAME=$(date +%Y-%m-%d_%H-%M-%S)
 
 FLAGS="d"
 [[ -n "${1}" ]] && FLAGS="${1}"
 # flags
-# d - duplicate, before copying the content of remote CB to local CB it stores it to localhost file (may be useful in some cases), TODO use as CB history (or Stack)
+# d - duplicate, before copying the content of remote CB to local CB it stores it to localhost file (may be useful in some cases)
 
-# set -e
-# set -x
-#shopt -s expand_aliases 2>/dev/null
+# set -e # abort on error
+# set -x # disable debug
 
 declare -A RCB_SERVERS
-# declare -A RCB_SERVERS_PATHS
 
-[[ -f "${THIS_DIR}/config.sh" ]] || mv "${THIS_DIR}/config-sample.sh" "${THIS_DIR}/config.sh"
-
+[[ -f "${THIS_DIR}/config.sh" ]] || cp "${THIS_DIR}/config-sample.sh" "${THIS_DIR}/config.sh"
 source "${THIS_DIR}/config.sh"
 
-# prepare clipboard copy here
+# RCB_FILES="~/.local/rclipboard/rcb"
 
-CB_DUPICATE="${THIS_DIR}/servers/"
-if [[ "${FLAGS}" == *"d"* ]]; then
-  mkdir -p "${CB_DUPICATE}"
-  for SRV_LBL in "${!RCB_SERVERS[@]}"; do
-    mkdir -p "${CB_DUPICATE}/${SRV_LBL}"
-  done
-fi
+############################################################
+# Here are functions for manipulating remote clipboards 
+############################################################
 
-COLOR_RED='\033[0;31m'
-COLOR_NC='\033[0m' # No Color
-ERR_MSG="${COLOR_RED}ERROR${COLOR_NC}: "
 
-# remote copy
-# copies content to remote clipboard
+# on remote machine copy input to its clipboard file
+# usage:
+# echo "content" | _rc  # store from pipe
+# maybe TODO: 
+# _rc "content" # store as argument
 _rc() {
+  # TODO this may actually not work and it may be required to use 'while read' 
+  [[ -d $(dirname "${RCB_FILES}") ]] || mkdir -p "${RCB_FILES}"
+  RCB_FILES_C="${RCB_FILES}-c"
+  [[ -f $(dirname "${RCB_FILES_C}") ]] || touch "${RCB_FILES_C}"
+  cat > "${RCB_FILES_C}"
+}
+
+# on remote machine paste from its clipboard file
+# usage:
+# _rp # prints by default content of file ~/.local/rclipboard/rcb
+_rp() {
+  RCB_FILES_P="${RCB_FILES}-p"
+  [[ -f "${RCB_FILES_P}" ]] && cat "${RCB_FILES_P}" || echo ""
+}
+
+# copy clipboard from local to remote
+# usage: 
+# _lc [SRV_LBL] # store from xclip using '_p', if [SRV_LBL] empt then used from ./rcb-last
+# TODO:
+# _lc <SRV_LBL> "content" # store from $2 param "content" 
+# echo "content" | _lc <SRV_LBL> # store from input 
+_lc() {
   THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-  [[ -f "${THIS_DIR}/main.sh" ]] && source "${THIS_DIR}/main.sh"
+  [[ -f "${THIS_DIR}/config.sh" ]] && source "${THIS_DIR}/config.sh"
+
+  LAST_USED_FILE="${THIS_DIR}/rcb-last"
+  [[ "${1}" == "-" || -n "${1}" ]] && SRV_LBL=$(eval "${LAST_USED_FILE}") || SRV_LBL="${1}"
+
+  if [[ -n "${SRV_LBL}" ]] ; then
+    echo "${ERR_MSG}Unknown remote server (param SRV_LBL in '_lc <SRV_LBL>'), exiting!"
+    return
+  fi
+
+  SRV_SSH=${RCB_SERVERS[${SRV_LBL}]}
+  SRV_CMD="source ~/.bashrc ; echo \${RCB_FILES} "
+  # set -x
+  SCP_RCB_FILES=$(eval "${SRV_SSH} '${SRV_CMD}'")
+  if [[ -z "${SCP_RCB_FILES}" ]]; then
+    # echo "${ERR_MSG}Unknown files SCP_RCB_FILES, make sure that the variable RCB_FILES on remote server in ~/.bashrc exists and is not empty. Exiting!"
+    # return
+    SCP_RCB_FILES="${RCB_FILES}" # same as local
+  fi
+  echo "${SRV_LBL}" > "${LAST_USED_FILE}"
+
+  SRV_SCP=${SRV_SSH/ssh /scp } # TODO doublecheck all possibilities ...
+  LCL_PASTE_FILE="${RCB_DATA_DIR}/${SRV_LBL}-c"
+  if [[ -f "${LCL_PASTE_FILE}" ]] ; then 
+    _p > "${LCL_PASTE_FILE}"
+    scp "${LCL_PASTE_FILE}" "${SRV_SCP}":"${SCP_RCB_FILES}-p" 
+  fi
+}
+
+# copies clipboard from remote to local
+# usage:
+# _lp <SRV_LBL> # prints content of remote clipboard copied to local machine 
+_lp() {
+  THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+  [[ -f "${THIS_DIR}/config.sh" ]] && source "${THIS_DIR}/config.sh"
 
   if [[ -z "${1}" ]]; then
     echo "${ERR_MSG}Missing server label, skipping"
     return
   fi
-  SRV_LBL="${1}"
-  SRV_SSH=${RCB_SERVERS[${SRV_LBL}]}
-  # SRV_CMD="grep CLIPBOARD_FILE ~/.bashrc "
-  SRV_CMD="source ~/.bashrc ; echo \${CLIPBOARD_FILE} "
-  CMD_GET_CB_PATH="ssh ${SRV_SSH} '${SRV_CMD}'"
-  # set -x
 
-  SRV_CB_PATH=$(eval "${CMD_GET_CB_PATH}")
-  if [[ -z "${SRV_CB_PATH}" ]]; then
-    echo "${ERR_MSG}Unknown file SRV_CB_PATH, make sure that variable CLIPBOARD_FILE on remote server in ~/.bashrc exists and is not empty"
+  if [[ "${1}" == "-" ]]; then
+    echo "TODO: Using last"
     return
   fi
-  CMD_SCP_CB="scp ${SRV_SSH}:${SRV_CB_PATH} ${CB_DUPICATE}/${SRV_LBL}-c"
-  # set +x
-  eval "${CMD_SCP_CB}"
-}
 
-# remote paste
-# copies content of remote clipboard file to current systems clipboard
-_rp() {
-  if [[ -z "${1}" ]]; then
-    echo "Missing server label"
+  SRV_LBL="${1}"
+  SRV_SSH=${RCB_SERVERS[${SRV_LBL}]}
+  # SRV_CMD="grep RCB_FILES ~/.bashrc "
+  SRV_CMD="source ~/.bashrc ; echo \${RCB_FILES}"
+  # set -x
+  SCP_RCB_FILES=$(eval "${SRV_SSH} '${SRV_CMD}'")
+  if [[ -z "${CMD_SCP_RCB}" ]]; then
+    # echo "${ERR_MSG}Unknown file CMD_SCP_RCB, make sure that variable RCB_FILRCB_FILESE on remote server in ~/.bashrc exists and is not empty"
+    # return
+    SCP_RCB_FILES="${RCB_FILES}" # same as on client
   fi
+  SRV_SCP=${SRV_SSH/ssh /scp } # TODO doublecheck all possibilities ...
+
+  LCL_PASTE_FILE="${RCB_DATA_DIR}/${SRV_LBL}-p"
+  if [[ -f ${LCL_PASTE_FILE} ]] ; then 
+    scp "${SRV_SCP}":"${SCP_RCB_FILE}-c" "${LCL_PASTE_FILE}"
+    cat "${LCL_PASTE_FILE}" | _c
+  fi
+  # set +x
 }
 
+############################################################
+# Here are functions for manipulating local clipboard
+############################################################
+# copy to clipboard
+# Usage:
+# echo "content" | _c
 _c() {
   cat | xclip -r -selection clipboard
 }
 
 # copy from pipeline to clipboard and echo..
-# more memory consuming than _c because output is stored as tmp variable
+# there was a problem when chaining some pipes with their buffer when using '_c' 
+# and nothing simple helped except this,
+# it is more memory consuming than _c because output is stored as tmp variable
+# Usage:
+# echo "content" | _c
 _ce() {
   # cat | xclip -r  -selection clipboard
   res=""
@@ -92,6 +167,8 @@ _ce() {
 }
 
 # paste from clipboard
+# Usage:
+# _p # prints content of clipboard
 _p() {
   xclip -selection clipboard -o
 }
