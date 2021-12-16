@@ -19,17 +19,10 @@
 THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 NOW_FILE_NAME=$(date +%Y-%m-%d_%H-%M-%S)
 
-FLAGS="d"
-[[ -n "${1}" ]] && FLAGS="${1}"
-# flags
-# d - duplicate, before copying the content of remote CB to local CB it stores it to localhost file (may be useful in some cases)
-
 # set -e # abort on error
 # set -x # disable debug
 
 declare -A RCB_SERVERS
-
-[[ -f "${THIS_DIR}/config.sh" ]] || cp "${THIS_DIR}/config-sample.sh" "${THIS_DIR}/config.sh"
 source "${THIS_DIR}/config.sh"
 
 # RCB_FILES="~/.local/rclipboard/rcb"
@@ -70,13 +63,13 @@ _lc() {
   THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
   [[ -f "${THIS_DIR}/config.sh" ]] && source "${THIS_DIR}/config.sh"
 
-  LAST_USED_FILE="${THIS_DIR}/rcb-last"
-  [[ "${1}" == "-" || -n "${1}" ]] && SRV_LBL=$(eval "${LAST_USED_FILE}") || SRV_LBL="${1}"
+  [[ "${1}" == "-" || -z "${1}" ]] && SRV_LBL=$(eval "${LAST_USED_FILE}") || SRV_LBL="${1}"
 
-  if [[ -n "${SRV_LBL}" ]] ; then
+  if [[ -z "${SRV_LBL}" ]] ; then
     echo "${ERR_MSG}Unknown remote server (param SRV_LBL in '_lc <SRV_LBL>'), exiting!"
     return
   fi
+  set -x
 
   SRV_SSH=${RCB_SERVERS[${SRV_LBL}]}
   SRV_CMD="source ~/.bashrc ; echo \${RCB_FILES} "
@@ -89,23 +82,30 @@ _lc() {
   fi
   echo "${SRV_LBL}" > "${LAST_USED_FILE}"
 
-  SRV_SCP=${SRV_SSH/ssh /scp } # TODO doublecheck all possibilities ...
+  SRV_CON=${SRV_SSH/ssh /} # TODO doublecheck all possibilities ...
+  
   LCL_PASTE_FILE="${RCB_DATA_DIR}/${SRV_LBL}-c"
+  touch ${LCL_PASTE_FILE}
+  # TODO decide which imput to use, 
+  # - default pipeline, 
+  # - if empty ask for confirmation to use content of local clipboard (one-click 'y|o', not Enter)
+  # or if [[ "${1}" == "_|l" ]] or smth like that 
   if [[ -f "${LCL_PASTE_FILE}" ]] ; then 
     _p > "${LCL_PASTE_FILE}"
-    scp "${LCL_PASTE_FILE}" "${SRV_SCP}":"${SCP_RCB_FILES}-p" 
+    scp "${LCL_PASTE_FILE}" "${SRV_CON}":"${SCP_RCB_FILES}-p" 
   fi
+  set +x
 }
 
 # copies clipboard from remote to local
 # usage:
-# _lp <SRV_LBL> # prints content of remote clipboard copied to local machine 
+# _lp <SRV_LBL> # copies content of remote clipboard to local machine and prints it
 _lp() {
   THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
   [[ -f "${THIS_DIR}/config.sh" ]] && source "${THIS_DIR}/config.sh"
-
+  
   if [[ -z "${1}" ]]; then
-    echo "${ERR_MSG}Missing server label, skipping"
+    echo "${ERR_MSG}Missing server label, exiting!"
     return
   fi
 
@@ -125,11 +125,11 @@ _lp() {
     # return
     SCP_RCB_FILES="${RCB_FILES}" # same as on client
   fi
-  SRV_SCP=${SRV_SSH/ssh /scp } # TODO doublecheck all possibilities ...
+  SRV_CON=${SRV_SSH/ssh /} # TODO doublecheck all possibilities ...
 
   LCL_PASTE_FILE="${RCB_DATA_DIR}/${SRV_LBL}-p"
   if [[ -f ${LCL_PASTE_FILE} ]] ; then 
-    scp "${SRV_SCP}":"${SCP_RCB_FILE}-c" "${LCL_PASTE_FILE}"
+    scp "${SRV_CON}":"${SCP_RCB_FILE}-c" "${LCL_PASTE_FILE}"
     cat "${LCL_PASTE_FILE}" | _c
   fi
   # set +x

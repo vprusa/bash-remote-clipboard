@@ -14,7 +14,9 @@ On both local and remote machines execute:
 ```
 git clone https://github.com/VUTBR-CVIS/bash-remote-clipboard.git
 cd bash-remote-clipboard
-source ./main.sh # should do the trick
+./install.sh # should do the trick
+# in config.sh change RCB_SERVERS
+./install.sh lr # should do the trick
 ```
 
 On local machine it is necessary to configure SSH access to remote machine.
