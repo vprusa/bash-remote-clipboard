@@ -14,9 +14,8 @@ On both local and remote machines execute:
 ```
 git clone https://github.com/VUTBR-CVIS/bash-remote-clipboard.git
 cd bash-remote-clipboard
-./install.sh # should do the trick
-# in config.sh change RCB_SERVERS
 ./install.sh lr # should do the trick
+# and in ./config.sh change content of variable RCB_SERVERS
 ```
 
 On local machine it is necessary to configure SSH access to remote machine.
@@ -30,18 +29,51 @@ CLIPBOARD_FILE="/path/to/cb" to ~/.bashrc
 
 ## Usage
 
-On remote machine with configured RCB_SERVERS as in config-sample.sh executing
+### Data from local to remote
+On local machine with configured RCB_SERVERS as in config-sample.sh executing
 
 ```
-echo "Hello, World!" | _rc
+echo "Hello, World!" | _lc AAAA
 ```
 
-will sore output of echo to remote clipboard cb-c.
-Which can be then read on local machine executing
+will sore output of echo to remote clipboard rcb-c.
+Which can be then read on remote machine executing
 
 ```
-_rp AAAA | cat
+_rp | cat
 ```
+
+### Data from remote to local
+
+On remote machine execute
+
+```
+echo "Hola, Mundo!" | _rc
+```
+
+On local machine execute
+
+```
+_lp AAAA | echo
+```
+
+which should print "Hola, Mundo!"
+
+#### Locally stored data to local clipboard
+
+To copy data to local clipboard execute
+
+```
+_lp AAAA | _c
+```
+
+and then executeing
+
+```
+_p | echo
+```
+
+will again print "Hola, Mundo!"
 
 ## Results
 

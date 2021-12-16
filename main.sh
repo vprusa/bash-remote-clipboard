@@ -78,13 +78,14 @@ _lc() {
   if [[ -z "${SCP_RCB_FILES}" ]]; then
     # echo "${ERR_MSG}Unknown files SCP_RCB_FILES, make sure that the variable RCB_FILES on remote server in ~/.bashrc exists and is not empty. Exiting!"
     # return
-    SCP_RCB_FILES="${RCB_FILES}" # same as local
+    # SCP_RCB_FILES="${RCB_FILES}" # same as local
+    SCP_RCB_FILES="${RCB_FILES_REL_DIR}" # same as local
   fi
   echo "${SRV_LBL}" > "${LAST_USED_FILE}"
 
   SRV_CON=${SRV_SSH/ssh /} # TODO doublecheck all possibilities ...
   
-  LCL_PASTE_FILE="${RCB_DATA_DIR}/${SRV_LBL}-c"
+  LCL_PASTE_FILE="${RCB_FILES_DIR}/${SRV_LBL}-c"
   touch ${LCL_PASTE_FILE}
   # TODO decide which imput to use, 
   # - default pipeline, 
@@ -120,18 +121,18 @@ _lp() {
   SRV_CMD="source ~/.bashrc ; echo \${RCB_FILES}"
   # set -x
   SCP_RCB_FILES=$(eval "${SRV_SSH} '${SRV_CMD}'")
-  if [[ -z "${CMD_SCP_RCB}" ]]; then
-    # echo "${ERR_MSG}Unknown file CMD_SCP_RCB, make sure that variable RCB_FILRCB_FILESE on remote server in ~/.bashrc exists and is not empty"
-    # return
-    SCP_RCB_FILES="${RCB_FILES}" # same as on client
+  if [[ -z "${SCP_RCB_FILES}" ]]; then
+    SCP_RCB_FILES="${RCB_FILES_REL_DIR}" # same as on client
   fi
   SRV_CON=${SRV_SSH/ssh /} # TODO doublecheck all possibilities ...
 
-  LCL_PASTE_FILE="${RCB_DATA_DIR}/${SRV_LBL}-p"
-  if [[ -f ${LCL_PASTE_FILE} ]] ; then 
-    scp "${SRV_CON}":"${SCP_RCB_FILE}-c" "${LCL_PASTE_FILE}"
-    cat "${LCL_PASTE_FILE}" | _c
-  fi
+  LCL_PASTE_FILE="${RCB_FILES_DIR}/${SRV_LBL}-p"
+  [[ -f ${LCL_PASTE_FILE} ]] || touch "${LCL_PASTE_FILE}"
+  # if [[ -f ${LCL_PASTE_FILE} ]] ; then 
+    scp "${SRV_CON}":"${SCP_RCB_FILES}-c" "${LCL_PASTE_FILE}"
+    # cat "${LCL_PASTE_FILE}" | _c
+    cat "${LCL_PASTE_FILE}" 
+  # fi
   # set +x
 }
 
